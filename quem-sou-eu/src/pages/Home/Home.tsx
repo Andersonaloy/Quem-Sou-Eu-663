@@ -141,15 +141,19 @@ function Home() {
       setPlayerName("");
       setRoomCode("");
 
-      // Envia os dados da sala e do participante para a próxima página.
-      navigate("/player", {
-        state: {
-          roomId: data.room.id,
-          roomCode: data.room.code,
-          playerId: data.player.id,
-          playerName: data.player.name,
-        },
-      });
+      // Mantém os dados básicos da participação durante a navegação
+      // entre as páginas do jogador, inclusive após atualizar a tela.
+      const playerData = {
+        roomId: data.room.id as string,
+        roomCode: data.room.code as string,
+        playerId: data.player.id as string,
+        playerName: data.player.name as string,
+      };
+
+      sessionStorage.setItem("playerRoomData", JSON.stringify(playerData));
+
+      // Abre a página exclusiva para responder às perguntas.
+      navigate("/player", { state: playerData });
     } catch (error) {
       console.error("Erro ao entrar na sala:", error);
 

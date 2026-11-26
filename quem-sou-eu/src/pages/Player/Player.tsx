@@ -3,23 +3,9 @@ import { useEffect, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 
 import { supabase } from "../../services/supabase";
+import { getPlayerRoomData } from "../../services/gameSession";
 
 import "./Player.css";
-
-// Dados recebidos da tela inicial após a entrada na sala.
-type PlayerLocationState = {
-  roomId: string;
-  roomCode: string;
-  playerId: string;
-  playerName: string;
-};
-
-// Participantes da sala.
-type RoomPlayer = {
-  id: string;
-  player_name: string;
-  player_status: string;
-};
 
 // Perguntas sorteadas para o jogador.
 type PlayerQuestion = {
@@ -40,16 +26,11 @@ function Player() {
   const navigate = useNavigate();
 
   // Recupera os dados enviados pelo Home.tsx.
-  const playerData = location.state as PlayerLocationState | null;
+  const playerData = getPlayerRoomData(location.state);
 
   // Guarda os identificadores para utilizar nos efeitos.
   const roomId = playerData?.roomId;
   const playerId = playerData?.playerId;
-
-  // Participantes da sala.
-  const [roomPlayers, setRoomPlayers] = useState<RoomPlayer[]>([]);
-  const [isLoadingPlayers, setIsLoadingPlayers] = useState(true);
-  const [playersError, setPlayersError] = useState("");
 
   // Perguntas e respostas do jogador.
   const [questions, setQuestions] = useState<PlayerQuestion[]>([]);
@@ -60,14 +41,10 @@ function Player() {
   const [isLoadingQuestions, setIsLoadingQuestions] = useState(true);
   const [questionsError, setQuestionsError] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [isReady, setIsReady] = useState(false);
 
   // Busca as três perguntas atribuídas ao jogador.
   useEffect(() => {
-    if (!roomId || !playerId) {
-      setIsLoadingQuestions(false);
-      return;
-    }
+    if (!roomId || !playerId) return;
 
     let isActive = true;
 
@@ -106,62 +83,6 @@ function Player() {
       isActive = false;
     };
   }, [roomId, playerId]);
-
-  // Busca e acompanha os participantes da sala em tempo real.
-  useEffect(() => {
-    if (!roomId) {
-      setIsLoadingPlayers(false);
-      return;
-    }
-
-    let isActive = true;
-
-    async function loadPlayers() {
-      const { data, error } = await supabase
-        .from("room_players")
-        .select("id, player_name, player_status")
-        .eq("room_id", roomId)
-        .order("joined_at", { ascending: true });
-
-      if (!isActive) return;
-
-      if (error) {
-        console.error("Erro ao carregar participantes:", error);
-        setPlayersError("Não foi possível carregar os participantes.");
-        setIsLoadingPlayers(false);
-        return;
-      }
-
-      setRoomPlayers(data ?? []);
-      setPlayersError("");
-      setIsLoadingPlayers(false);
-    }
-
-    const channel = supabase
-      .channel(`player-room-${roomId}`)
-      .on(
-        "postgres_changes",
-        {
-          event: "*",
-          schema: "public",
-          table: "room_players",
-          filter: `room_id=eq.${roomId}`,
-        },
-        () => {
-          loadPlayers();
-        }
-      )
-      .subscribe((status) => {
-        if (status === "SUBSCRIBED") {
-          loadPlayers();
-        }
-      });
-
-    return () => {
-      isActive = false;
-      supabase.removeChannel(channel);
-    };
-  }, [roomId]);
 
   // Atualiza a resposta da pergunta atual.
   function handleAnswerChange(value: string) {
@@ -219,22 +140,10 @@ function Player() {
       return;
     }
 
-    // A função do servidor já altera o status para ready.
-    setIsReady(true);
+    // As respostas foram salvas. Agora o jogador vai para
+    // uma página exclusiva de espera, sem misturar as etapas.
     setIsSubmitting(false);
-  }
-
-  // Traduz o status interno dos participantes.
-  function getPlayerStatusLabel(status: string) {
-    const statuses: Record<string, string> = {
-      answering: "Respondendo",
-      ready: "Pronto",
-      playing: "Em partida",
-      finished: "Finalizou",
-      disconnected: "Desconectado",
-    };
-
-    return statuses[status] ?? "Aguardando";
+    navigate("/player/lobby", { state: playerData });
   }
 
   // Impede o acesso sem uma entrada válida na sala.
@@ -291,17 +200,6 @@ function Player() {
               >
                 TENTAR NOVAMENTE
               </button>
-            </div>
-          ) : isReady ? (
-            <div className="player-ready">
-              <div className="player-ready-icon">✓</div>
-
-              <h2>VOCÊ ESTÁ PRONTO!</h2>
-
-              <p>
-                Suas respostas foram enviadas com sucesso.
-                Agora é só aguardar o anfitrião.
-              </p>
             </div>
           ) : questions.length === 3 ? (
             <>
@@ -412,53 +310,6 @@ function Player() {
           )}
         </section>
 
-        {/* Lista de participantes da sala. */}
-        <section className="player-lobby">
-          <div className="player-lobby-heading">
-            <div>
-              <h2>Participantes da sala</h2>
-              <p>Veja quem já entrou na partida.</p>
-            </div>
-
-            <div className="player-counter">
-              <strong>{roomPlayers.length}</strong>
-              <span>JOGADORES</span>
-            </div>
-          </div>
-
-          {playersError && (
-            <p className="player-error">{playersError}</p>
-          )}
-
-          {isLoadingPlayers ? (
-            <p className="player-empty">Carregando participantes...</p>
-          ) : roomPlayers.length === 0 ? (
-            <p className="player-empty">
-              Aguardando os participantes...
-            </p>
-          ) : (
-            <div className="player-list">
-              {roomPlayers.map((player) => (
-                <article className="player-list-item" key={player.id}>
-                  <div className="player-avatar">
-                    {player.player_name.charAt(0).toUpperCase()}
-                  </div>
-
-                  <div className="player-list-info">
-                    <strong>
-                      {player.player_name}
-                      {player.id === playerData.playerId && " (Você)"}
-                    </strong>
-
-                    <span>
-                      {getPlayerStatusLabel(player.player_status)}
-                    </span>
-                  </div>
-                </article>
-              ))}
-            </div>
-          )}
-        </section>
       </section>
     </main>
   );

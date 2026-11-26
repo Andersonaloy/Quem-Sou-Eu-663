@@ -12,29 +12,6 @@ type Question = {
   text: string;
 };
 
-// Dados retornados após a criação da sala.
-type CreatedRoom = {
-  id: string;
-  code: string;
-};
-
-// Dados de cada participante cadastrado na sala.
-type RoomPlayer = {
-  id: string;
-  player_name: string;
-  player_status: string;
-  joined_at: string;
-};
-
-// Dados públicos retornados quando a partida é iniciada.
-type StartedGame = {
-  roundNumber: number;
-  questionNumber: number;
-  phase: string;
-  clueQuestion: string;
-  clueAnswer: string;
-};
-
 function Host() {
   const navigate = useNavigate();
 
@@ -60,23 +37,6 @@ function Host() {
 
   const [isCreatingRoom, setIsCreatingRoom] = useState(false);
   const [roomError, setRoomError] = useState("");
-  const [createdRoom, setCreatedRoom] = useState<CreatedRoom | null>(null);
-
-  // =========================================
-  // ESTADOS DOS PARTICIPANTES
-  // =========================================
-
-  const [roomPlayers, setRoomPlayers] = useState<RoomPlayer[]>([]);
-  const [isLoadingPlayers, setIsLoadingPlayers] = useState(false);
-  const [playersError, setPlayersError] = useState("");
-
-  // =========================================
-  // INÍCIO DA PARTIDA
-  // =========================================
-
-  const [isStartingGame, setIsStartingGame] = useState(false);
-  const [startGameError, setStartGameError] = useState("");
-  const [startedGame, setStartedGame] = useState<StartedGame | null>(null);
 
   // =========================================
   // VERIFICAÇÃO DO ACESSO DO ANFITRIÃO
@@ -121,89 +81,6 @@ function Host() {
       isMounted = false;
     };
   }, [navigate]);
-
-  // =========================================
-  // LOBBY EM TEMPO REAL
-  // =========================================
-
-  useEffect(() => {
-    // Só acompanha participantes depois que uma sala é criada.
-    if (!createdRoom?.id) {
-      setRoomPlayers([]);
-      setIsLoadingPlayers(false);
-      return;
-    }
-
-    // Guarda o ID para utilizar com segurança nas funções internas.
-    const roomId = createdRoom.id;
-
-    let isActive = true;
-
-    // Busca a lista atual de participantes no banco.
-    async function loadPlayers() {
-      const { data, error } = await supabase
-        .from("room_players")
-        .select("id, player_name, player_status, joined_at")
-        .eq("room_id", roomId)
-        .order("joined_at", { ascending: true });
-
-      // Evita atualizar a tela se o componente já foi desmontado.
-      if (!isActive) return;
-
-      if (error) {
-        console.error("Erro ao carregar participantes:", error);
-        setPlayersError("Não foi possível carregar os participantes.");
-        setIsLoadingPlayers(false);
-        return;
-      }
-
-      setRoomPlayers(data ?? []);
-      setPlayersError("");
-      setIsLoadingPlayers(false);
-    }
-
-    setIsLoadingPlayers(true);
-    setPlayersError("");
-
-    // Cria uma conexão para receber alterações na lista de jogadores.
-    const channel = supabase
-      .channel(`host-room-${roomId}`)
-      .on(
-        "postgres_changes",
-        {
-          event: "*",
-          schema: "public",
-          table: "room_players",
-          filter: `room_id=eq.${roomId}`,
-        },
-        () => {
-          // Quando alguém entrar ou tiver o status alterado,
-          // buscamos novamente a lista atualizada.
-          loadPlayers();
-        }
-      )
-      .subscribe((status) => {
-        if (status === "SUBSCRIBED") {
-          loadPlayers();
-        }
-
-        if (
-          status === "CHANNEL_ERROR" ||
-          status === "TIMED_OUT"
-        ) {
-          setPlayersError(
-            "Não foi possível conectar à atualização em tempo real."
-          );
-          setIsLoadingPlayers(false);
-        }
-      });
-
-    // Encerra a conexão quando a sala mudar ou a página for fechada.
-    return () => {
-      isActive = false;
-      supabase.removeChannel(channel);
-    };
-  }, [createdRoom?.id]);
 
   // =========================================
   // CADASTRO DE PERGUNTAS
@@ -318,7 +195,6 @@ function Host() {
 
     setIsCreatingRoom(true);
     setRoomError("");
-    setCreatedRoom(null);
 
     try {
       // A Edge Function valida o anfitrião, gera o código
@@ -343,10 +219,18 @@ function Host() {
         );
       }
 
-      // Guarda os dados retornados para exibir o código na tela.
-      setCreatedRoom({
-        id: data.room.id,
-        code: data.room.code,
+      // Guarda os dados da sala para que o anfitrião possa
+      // continuar mesmo se atualizar a página da sala de espera.
+      const roomData = {
+        id: data.room.id as string,
+        code: data.room.code as string,
+      };
+
+      sessionStorage.setItem("hostRoomData", JSON.stringify(roomData));
+
+      // A sala de espera agora é uma página independente.
+      navigate("/host/lobby", {
+        state: { roomId: roomData.id, roomCode: roomData.code },
       });
     } catch (error) {
       console.error("Erro ao criar sala:", error);
@@ -360,109 +244,6 @@ function Host() {
       setIsCreatingRoom(false);
     }
   }
-
-  // Copia o código da sala para a área de transferência.
-  async function handleCopyRoomCode() {
-    if (!createdRoom) return;
-
-    try {
-      await navigator.clipboard.writeText(createdRoom.code);
-      alert("Código da sala copiado!");
-    } catch (error) {
-      console.error("Erro ao copiar código:", error);
-      setRoomError("Não foi possível copiar o código automaticamente.");
-    }
-  }
-
-  // =========================================
-  // INICIAR PARTIDA
-  // =========================================
-
-  async function handleStartGame() {
-    if (!createdRoom || isStartingGame) return;
-
-    // Evita chamar o servidor enquanto houver jogadores pendentes.
-    if (roomPlayers.length < 2) {
-      setStartGameError("São necessários pelo menos dois jogadores.");
-      return;
-    }
-
-    if (!roomPlayers.every((player) => player.player_status === "ready")) {
-      setStartGameError("Aguarde todos os jogadores ficarem prontos.");
-      return;
-    }
-
-    setIsStartingGame(true);
-    setStartGameError("");
-
-    try {
-      const { data, error } = await supabase.functions.invoke("start-game", {
-        body: {
-          roomId: createdRoom.id,
-        },
-      });
-
-      if (error) {
-        console.error("Erro ao chamar start-game:", error);
-        throw new Error(
-          data?.message ||
-            "Não foi possível comunicar com o servidor para iniciar a partida."
-        );
-      }
-
-      if (
-        !data?.success ||
-        !data?.round?.clueQuestion ||
-        !data?.round?.clueAnswer
-      ) {
-        throw new Error(
-          data?.message || "O servidor não retornou os dados da primeira pista."
-        );
-      }
-
-      // Guarda apenas a pista pública. A identidade do participante
-      // sorteado não é retornada nem exibida nesta tela.
-      setStartedGame(data.round);
-    } catch (error) {
-      console.error("Erro ao iniciar partida:", error);
-
-      setStartGameError(
-        error instanceof Error
-          ? error.message
-          : "Ocorreu um erro inesperado ao iniciar a partida."
-      );
-    } finally {
-      setIsStartingGame(false);
-    }
-  }
-
-  // =========================================
-  // STATUS DOS PARTICIPANTES
-  // =========================================
-
-  // Traduz o status interno para uma informação amigável.
-  function getPlayerStatusLabel(status: string) {
-    const statuses: Record<string, string> = {
-      answering: "Respondendo",
-      ready: "Pronto",
-      playing: "Em partida",
-      finished: "Finalizou",
-      disconnected: "Desconectado",
-    };
-
-    return statuses[status] ?? "Aguardando";
-  }
-
-  // Quantidade de participantes que já enviaram as respostas.
-  const readyPlayersCount = roomPlayers.filter(
-    (player) => player.player_status === "ready"
-  ).length;
-
-  // Só permite iniciar com pelo menos dois jogadores e todos prontos.
-  const canStartGame =
-    roomPlayers.length >= 2 &&
-    readyPlayersCount === roomPlayers.length &&
-    !isLoadingPlayers;
 
   // =========================================
   // ESTADOS DE CARREGAMENTO E AUTORIZAÇÃO
@@ -634,15 +415,9 @@ function Host() {
           <button
             className="button-primary create-room-button"
             onClick={handleCreateRoom}
-            disabled={
-              questions.length < 3 || isCreatingRoom || Boolean(startedGame)
-            }
+            disabled={questions.length < 3 || isCreatingRoom}
           >
-            {isCreatingRoom
-              ? "CRIANDO SALA..."
-              : createdRoom
-                ? "CRIAR OUTRA SALA"
-                : "CRIAR SALA"}
+            {isCreatingRoom ? "CRIANDO SALA..." : "CRIAR SALA"}
           </button>
         </div>
 
@@ -650,149 +425,6 @@ function Host() {
           <p className="room-error">{roomError}</p>
         )}
 
-        {/* =====================================
-            ETAPA 02 — SALA E PARTICIPANTES
-        ====================================== */}
-
-        {createdRoom && (
-          <>
-            {/* Código para compartilhar com os jogadores */}
-            <section className="created-room">
-              <span className="created-room-label">
-                SALA CRIADA COM SUCESSO
-              </span>
-
-              <h3>Compartilhe o código com os jogadores</h3>
-
-              <div className="created-room-code">
-                <strong>{createdRoom.code}</strong>
-
-                <button
-                  className="button-primary"
-                  onClick={handleCopyRoomCode}
-                >
-                  COPIAR CÓDIGO
-                </button>
-              </div>
-
-              <p>
-                Os participantes poderão utilizar esse código na tela inicial
-                para entrar na partida.
-              </p>
-            </section>
-
-            {/* Lobby atualizado em tempo real */}
-            <section className="room-lobby">
-              <div className="room-lobby-heading">
-                <div>
-                  <span className="host-step">ETAPA 02</span>
-                  <h3>Participantes da sala</h3>
-                  <p>As entradas serão atualizadas automaticamente.</p>
-                </div>
-
-                <div className="room-player-counter">
-                  <strong>{roomPlayers.length}</strong>
-                  <span>JOGADORES</span>
-                </div>
-              </div>
-
-              {playersError && (
-                <p className="room-error">{playersError}</p>
-              )}
-
-              {isLoadingPlayers ? (
-                <p className="room-lobby-empty">
-                  Carregando participantes...
-                </p>
-              ) : roomPlayers.length === 0 ? (
-                <div className="room-lobby-empty">
-                  <strong>Aguardando jogadores</strong>
-                  <p>
-                    Compartilhe o código da sala para que seus colegas
-                    possam entrar.
-                  </p>
-                </div>
-              ) : (
-                <div className="room-player-list">
-                  {roomPlayers.map((player, index) => (
-                    <article className="room-player-item" key={player.id}>
-                      <div className="room-player-avatar">
-                        {player.player_name.charAt(0).toUpperCase()}
-                      </div>
-
-                      <div className="room-player-info">
-                        <strong>{player.player_name}</strong>
-                        <span>Participante {index + 1}</span>
-                      </div>
-
-                      <span
-                        className={`room-player-status status-${player.player_status}`}
-                      >
-                        {getPlayerStatusLabel(player.player_status)}
-                      </span>
-                    </article>
-                  ))}
-                </div>
-              )}
-
-              {/* Controles para iniciar a partida. */}
-              {!startedGame && (
-                <div className="start-game-section">
-                  <div className="start-game-status">
-                    <strong>
-                      {readyPlayersCount} de {roomPlayers.length} jogadores prontos
-                    </strong>
-                    <p>
-                      {roomPlayers.length < 2
-                        ? "A partida precisa de pelo menos dois jogadores."
-                        : canStartGame
-                          ? "Todos os participantes estão prontos para jogar."
-                          : "Aguardando os demais participantes enviarem suas respostas."}
-                    </p>
-                  </div>
-
-                  <button
-                    className="button-primary start-game-button"
-                    onClick={handleStartGame}
-                    disabled={!canStartGame || isStartingGame}
-                  >
-                    {isStartingGame ? "INICIANDO PARTIDA..." : "INICIAR PARTIDA"}
-                  </button>
-
-                  {startGameError && (
-                    <p className="room-error">{startGameError}</p>
-                  )}
-                </div>
-              )}
-
-              {/* Primeira pista exibida após o início. */}
-              {startedGame && (
-                <section className="started-game-panel">
-                  <span className="created-room-label">PARTIDA INICIADA</span>
-                  <h3>Rodada {startedGame.roundNumber}</h3>
-                  <span className="started-game-question-label">
-                    PERGUNTA {startedGame.questionNumber}
-                  </span>
-
-                  <div className="started-game-clue">
-                    <span>PERGUNTA</span>
-                    <p>{startedGame.clueQuestion}</p>
-                  </div>
-
-                  <div className="started-game-clue">
-                    <span>RESPOSTA / PISTA</span>
-                    <p>{startedGame.clueAnswer}</p>
-                  </div>
-
-                  <p className="started-game-note">
-                    A identidade do participante permanece oculta até o momento
-                    de revelação definido pelo anfitrião.
-                  </p>
-                </section>
-              )}
-            </section>
-          </>
-        )}
       </section>
     </main>
   );

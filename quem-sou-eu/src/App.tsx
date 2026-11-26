@@ -1,10 +1,13 @@
-
 import { useEffect, useState } from "react";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 
 import Home from "./pages/Home/Home";
 import Host from "./pages/Host/Host";
+import HostLobby from "./pages/HostLobby/HostLobby";
+import HostGame from "./pages/HostGame/HostGame";
 import Player from "./pages/Player/Player";
+import PlayerLobby from "./pages/PlayerLobby/PlayerLobby";
+import PlayerGame from "./pages/PlayerGame/PlayerGame";
 
 import { getOrCreateSession } from "./services/auth";
 
@@ -29,7 +32,6 @@ function App() {
     initializeAuth();
   }, []);
 
-  // Enquanto a autenticação acontece, não mostramos as páginas.
   if (!authReady && !authError) {
     return (
       <main className="loading-screen">
@@ -55,8 +57,16 @@ function App() {
     <BrowserRouter>
       <Routes>
         <Route path="/" element={<Home />} />
+
+        {/* Fluxo do anfitrião: configuração → espera → partida. */}
         <Route path="/host" element={<Host />} />
+        <Route path="/host/lobby" element={<HostLobby />} />
+        <Route path="/host/game" element={<HostGame />} />
+
+        {/* Fluxo do jogador: respostas → espera → partida. */}
         <Route path="/player" element={<Player />} />
+        <Route path="/player/lobby" element={<PlayerLobby />} />
+        <Route path="/player/game" element={<PlayerGame />} />
       </Routes>
     </BrowserRouter>
   );
