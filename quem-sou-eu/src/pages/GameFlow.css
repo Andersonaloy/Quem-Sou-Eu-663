@@ -312,3 +312,125 @@
     letter-spacing: 5px;
   }
 }
+
+
+/* ------------------------------------------------------
+   ÁREA DE PALPITES DA TELA DO JOGADOR
+------------------------------------------------------ */
+
+.flow-guess-section {
+  margin-top: 30px;
+  padding-top: 26px;
+  border-top: 1px solid #352a46;
+}
+
+.flow-guess-heading h2 {
+  margin: 0 0 7px;
+  font-size: 22px;
+}
+
+.flow-guess-heading p {
+  color: #aaa3b8;
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.flow-guess-options {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+  margin-top: 20px;
+}
+
+.flow-guess-option {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+  padding: 12px;
+  border: 1px solid #493469;
+  border-radius: 12px;
+  color: #fff;
+  background: #211a2c;
+  text-align: left;
+  cursor: pointer;
+  transition: border-color 0.2s ease, background 0.2s ease, transform 0.2s ease;
+}
+
+.flow-guess-option:hover:not(:disabled) {
+  border-color: #a77af0;
+  transform: translateY(-1px);
+}
+
+.flow-guess-option.is-selected {
+  border-color: #a77af0;
+  background: #302342;
+  box-shadow: 0 0 0 2px rgba(167, 122, 240, 0.12);
+}
+
+.flow-guess-option:disabled {
+  opacity: 0.65;
+  cursor: wait;
+}
+
+.flow-guess-option > span:last-child {
+  overflow-wrap: anywhere;
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.flow-guess-submit {
+  width: 100%;
+  margin-top: 18px;
+}
+
+.flow-guess-result {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 20px;
+  padding: 20px;
+  border: 1px solid #493469;
+  border-radius: 12px;
+  background: #211a2c;
+}
+
+.flow-guess-result strong {
+  font-size: 20px;
+}
+
+.flow-guess-result p {
+  color: #d8d0e3;
+  line-height: 1.5;
+}
+
+.flow-guess-result > span {
+  color: #79d6a4;
+  font-size: 18px;
+  font-weight: 800;
+}
+
+.flow-guess-result small {
+  margin-top: 4px;
+  color: #aaa3b8;
+  line-height: 1.5;
+}
+
+.flow-guess-result.is-correct {
+  border-color: rgba(80, 190, 130, 0.55);
+  background: rgba(35, 92, 65, 0.2);
+}
+
+.flow-guess-result.is-correct strong {
+  color: #79d6a4;
+}
+
+.flow-guess-result.is-incorrect {
+  border-color: rgba(167, 122, 240, 0.4);
+}
+
+@media (max-width: 600px) {
+  .flow-guess-options {
+    grid-template-columns: 1fr;
+  }
+}

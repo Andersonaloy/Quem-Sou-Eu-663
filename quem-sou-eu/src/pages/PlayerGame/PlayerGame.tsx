@@ -7,6 +7,7 @@ import { getPlayerRoomData } from "../../services/gameSession";
 import "../GameFlow.css";
 
 type PublicGameState = {
+  round_id: string;
   round_number: number;
   question_number: number;
   phase: string;
@@ -14,15 +15,33 @@ type PublicGameState = {
   clue_answer: string;
 };
 
+type RoomPlayer = {
+  id: string;
+  player_name: string;
+  player_status: string;
+};
+
+type GuessResult = {
+  isCorrect: boolean;
+  pointsAwarded: number;
+  message: string;
+};
+
 function PlayerGame() {
   const location = useLocation();
   const navigate = useNavigate();
+
   const player = useMemo(
     () => getPlayerRoomData(location.state),
     [location.state]
   );
 
   const [game, setGame] = useState<PublicGameState | null>(null);
+  const [players, setPlayers] = useState<RoomPlayer[]>([]);
+  const [selectedPlayerId, setSelectedPlayerId] = useState("");
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [guessSubmitted, setGuessSubmitted] = useState(false);
+  const [guessResult, setGuessResult] = useState<GuessResult | null>(null);
   const [error, setError] = useState("");
 
   useEffect(() => {
@@ -30,14 +49,16 @@ function PlayerGame() {
       navigate("/", { replace: true });
       return;
     }
-    const roomId = player.roomId;
 
+    const roomId = player.roomId;
     let active = true;
 
     async function loadGameState() {
       const { data, error: queryError } = await supabase
         .from("game_public_state")
-        .select("round_number, question_number, phase, clue_question, clue_answer")
+        .select(
+          "round_id, round_number, question_number, phase, clue_question, clue_answer"
+        )
         .eq("room_id", roomId)
         .maybeSingle();
 
@@ -52,7 +73,25 @@ function PlayerGame() {
       }
     }
 
+    async function loadPlayers() {
+      const { data, error: playersError } = await supabase
+        .from("room_players")
+        .select("id, player_name, player_status")
+        .eq("room_id", roomId)
+        .order("joined_at", { ascending: true });
+
+      if (!active) return;
+
+      if (playersError) {
+        console.error("Erro ao carregar participantes:", playersError);
+        setError("Não foi possível carregar a lista de participantes.");
+      } else {
+        setPlayers(data ?? []);
+      }
+    }
+
     loadGameState();
+    loadPlayers();
 
     const channel = supabase
       .channel(`player-game-${roomId}`)
@@ -66,6 +105,16 @@ function PlayerGame() {
         },
         loadGameState
       )
+      .on(
+        "postgres_changes",
+        {
+          event: "*",
+          schema: "public",
+          table: "room_players",
+          filter: `room_id=eq.${roomId}`,
+        },
+        loadPlayers
+      )
       .subscribe();
 
     return () => {
@@ -74,14 +123,75 @@ function PlayerGame() {
     };
   }, [navigate, player]);
 
-  if (!player) {
-    return <main className="flow-screen"><p>Recuperando sua participação...</p></main>;
+  // Uma nova pista libera um novo palpite na interface.
+  useEffect(() => {
+    setSelectedPlayerId("");
+    setGuessSubmitted(false);
+    setGuessResult(null);
+    setError("");
+  }, [game?.round_id, game?.question_number]);
+
+  async function handleSubmitGuess() {
+    if (!player || !game || !selectedPlayerId || isSubmitting || guessSubmitted) {
+      return;
+    }
+
+    setIsSubmitting(true);
+    setError("");
+
+    try {
+      const { data, error: functionError } = await supabase.functions.invoke(
+        "submit-guess",
+        {
+          body: {
+            roomId: player.roomId,
+            playerId: player.playerId,
+            guessedPlayerId: selectedPlayerId,
+          },
+        }
+      );
+
+      if (functionError || !data?.success) {
+        console.error("Erro ao enviar palpite:", functionError, data);
+        setError(
+          data?.message ||
+            "Não foi possível registrar seu palpite. Tente novamente."
+        );
+        return;
+      }
+
+      setGuessSubmitted(true);
+      setGuessResult({
+        isCorrect: Boolean(data.isCorrect),
+        pointsAwarded: Number(data.pointsAwarded) || 0,
+        message: data.message || "Palpite registrado.",
+      });
+    } catch (submitError) {
+      console.error("Erro inesperado ao enviar palpite:", submitError);
+      setError("Ocorreu um erro ao enviar seu palpite. Tente novamente.");
+    } finally {
+      setIsSubmitting(false);
+    }
   }
+
+  if (!player) {
+    return (
+      <main className="flow-screen">
+        <p>Recuperando sua participação...</p>
+      </main>
+    );
+  }
+
+  const availablePlayers = players.filter(
+    (roomPlayer) => roomPlayer.id !== player.playerId
+  );
 
   return (
     <main className="flow-screen flow-game-screen">
       <section className="flow-card flow-game-card">
-        <span className="flow-eyebrow">QUEM SOU EU? · {player.playerName}</span>
+        <span className="flow-eyebrow">
+          QUEM SOU EU? · {player.playerName}
+        </span>
         <h1>Partida em andamento</h1>
 
         {error && <p className="flow-error">{error}</p>}
@@ -91,19 +201,96 @@ function PlayerGame() {
         ) : (
           <>
             <div className="flow-round-label">
-              RODADA {game.round_number} <span>·</span> PERGUNTA {game.question_number}
+              RODADA {game.round_number}
+              <span>·</span>
+              PERGUNTA {game.question_number}
             </div>
+
             <div className="flow-clue-block">
               <span>PERGUNTA</span>
               <h2>{game.clue_question}</h2>
             </div>
+
             <div className="flow-clue-block flow-answer-block">
               <span>PISTA</span>
               <h2>{game.clue_answer}</h2>
             </div>
+
+            {game.phase === "asking" ? (
+              <section className="flow-guess-section">
+                <div className="flow-guess-heading">
+                  <h2>Quem você acha que é?</h2>
+                  <p>Escolha um colega. Você não pode votar em si mesmo.</p>
+                </div>
+
+                {guessSubmitted && guessResult ? (
+                  <div
+                    className={`flow-guess-result ${
+                      guessResult.isCorrect ? "is-correct" : "is-incorrect"
+                    }`}
+                    role="status"
+                  >
+                    <strong>
+                      {guessResult.isCorrect ? "Você acertou!" : "Palpite registrado"}
+                    </strong>
+                    <p>{guessResult.message}</p>
+                    {guessResult.isCorrect && (
+                      <span>+{guessResult.pointsAwarded} pontos</span>
+                    )}
+                    <small>
+                      Aguarde o anfitrião avançar para a próxima pista.
+                    </small>
+                  </div>
+                ) : (
+                  <>
+                    {availablePlayers.length === 0 ? (
+                      <p className="flow-empty">
+                        Não há outros participantes para escolher.
+                      </p>
+                    ) : (
+                      <div className="flow-guess-options">
+                        {availablePlayers.map((roomPlayer) => (
+                          <button
+                            key={roomPlayer.id}
+                            type="button"
+                            className={`flow-guess-option ${
+                              selectedPlayerId === roomPlayer.id
+                                ? "is-selected"
+                                : ""
+                            }`}
+                            onClick={() => setSelectedPlayerId(roomPlayer.id)}
+                            disabled={isSubmitting}
+                          >
+                            <span className="flow-avatar">
+                              {roomPlayer.player_name.charAt(0).toUpperCase()}
+                            </span>
+                            <span>{roomPlayer.player_name}</span>
+                          </button>
+                        ))}
+                      </div>
+                    )}
+
+                    <button
+                      type="button"
+                      className="flow-button flow-button-primary flow-guess-submit"
+                      onClick={handleSubmitGuess}
+                      disabled={!selectedPlayerId || isSubmitting}
+                    >
+                      {isSubmitting ? "ENVIANDO PALPITE..." : "CONFIRMAR PALPITE"}
+                    </button>
+                  </>
+                )}
+              </section>
+            ) : (
+              <p className="flow-note">
+                Esta etapa não está aceitando palpites. Aguarde as orientações
+                do anfitrião.
+              </p>
+            )}
+
             <p className="flow-note">
-              Fique atento às pistas. A identidade será revelada no momento
-              definido pelo anfitrião.
+              A identidade será revelada somente no momento definido pelo
+              anfitrião.
             </p>
           </>
         )}
