@@ -50,6 +50,7 @@ function PlayerGame() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [guessSubmitted, setGuessSubmitted] = useState(false);
   const [guessResult, setGuessResult] = useState<GuessResult | null>(null);
+  const [hasCorrectlyGuessedRound, setHasCorrectlyGuessedRound] = useState(false);
   const [error, setError] = useState("");
 
   useEffect(() => {
@@ -146,14 +147,26 @@ function PlayerGame() {
     };
   }, [navigate, player]);
 
-  // Ao mudar de pista, libera uma nova tentativa de palpite.
+  // Ao começar uma nova rodada, limpa o estado da rodada anterior.
+  // O acerto fica guardado durante as três pistas da mesma rodada.
+  useEffect(() => {
+    setSelectedPlayerId("");
+    setGuessSubmitted(false);
+    setGuessResult(null);
+    setHasCorrectlyGuessedRound(false);
+    setIsTargetPlayer(null);
+    setError("");
+  }, [game?.round_id]);
+
+  // Quando chega uma nova pista, libera uma nova tentativa somente para
+  // quem ainda não acertou nesta rodada.
   useEffect(() => {
     setSelectedPlayerId("");
     setGuessSubmitted(false);
     setGuessResult(null);
     setIsTargetPlayer(null);
     setError("");
-  }, [game?.round_id, game?.question_number]);
+  }, [game?.question_number]);
 
   async function handleSubmitGuess() {
     if (!player || !game || !selectedPlayerId || isSubmitting || guessSubmitted || isTargetPlayer !== false) {
@@ -182,6 +195,9 @@ function PlayerGame() {
       }
 
       setGuessSubmitted(true);
+      if (Boolean(data.isCorrect)) {
+        setHasCorrectlyGuessedRound(true);
+      }
       setGuessResult({
         isCorrect: Boolean(data.isCorrect),
         pointsAwarded: Number(data.pointsAwarded) || 0,
@@ -232,37 +248,32 @@ function PlayerGame() {
               {game.phase === "revealed" ? "RODADA REVELADA" : `PERGUNTA ${game.question_number} DE 3`}
             </div>
 
-            <div className="flow-clue-block">
-              <span>PERGUNTA</span>
-              <h2>{game.clue_question}</h2>
-            </div>
-            <div className="flow-clue-block flow-answer-block">
-              <span>PISTA</span>
-              <h2>{game.clue_answer}</h2>
-            </div>
+            {game.phase !== "revealed" && (
+              <>
+                <div className="flow-clue-block">
+                  <span>PERGUNTA</span>
+                  <h2>{game.clue_question}</h2>
+                </div>
+                <div className="flow-clue-block flow-answer-block">
+                  <span>PISTA</span>
+                  <h2>{game.clue_answer}</h2>
+                </div>
+              </>
+            )}
 
             {game.phase === "revealed" ? (
               <section className="flow-reveal-panel">
                 <span className="flow-eyebrow">A PESSOA ERA</span>
                 <h2 className="flow-revealed-name">{game.revealed_player_name}</h2>
-                <h3>Resultado dos palpites</h3>
-                {game.reveal_results?.length ? (
-                  <div className="flow-results-list">
-                    {game.reveal_results.map((result, index) => (
-                      <div className="flow-result-row" key={`${result.playerName}-${result.questionNumber}-${index}`}>
-                        <div>
-                          <strong>{result.playerName}</strong>
-                          <small>Pergunta {result.questionNumber}: {result.guessedName}</small>
-                        </div>
-                        <span className={result.isCorrect ? "is-correct" : "is-incorrect"}>
-                          {result.isCorrect ? `Acertou · +${result.pointsAwarded} pts` : "Errou · 0 pts"}
-                        </span>
-                      </div>
-                    ))}
-                  </div>
-                ) : (
-                  <p className="flow-empty">Ninguém enviou palpites nesta rodada.</p>
-                )}
+                <h3>Pontuação atual</h3>
+                <div className="flow-results-list">
+                  {ranking.map((roomPlayer) => (
+                    <div className="flow-result-row" key={roomPlayer.id}>
+                      <strong>{roomPlayer.player_name}</strong>
+                      <span>{Number(roomPlayer.score) || 0} pts</span>
+                    </div>
+                  ))}
+                </div>
                 <p className="flow-note">Aguarde o anfitrião iniciar a próxima rodada.</p>
               </section>
             ) : isTargetPlayer === null ? (
@@ -274,6 +285,15 @@ function PlayerGame() {
                 <p>
                   Não fale nada e mantenha o segredo! Agora é a vez dos seus
                   colegas tentarem descobrir quem é você.
+                </p>
+              </section>
+            ) : hasCorrectlyGuessedRound ? (
+              <section className="flow-target-message" role="status">
+                <span className="flow-target-icon" aria-hidden="true">✓</span>
+                <h2>Você já acertou!</h2>
+                <p>
+                  Você já descobriu quem é a pessoa desta rodada. Aguarde seus
+                  colegas terminarem os palpites.
                 </p>
               </section>
             ) : game.phase === "asking" ? (

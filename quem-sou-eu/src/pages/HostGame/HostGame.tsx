@@ -276,39 +276,32 @@ function HostGame() {
               </section>
             )}
 
-            <div className="flow-clue-block">
-              <span>PERGUNTA</span>
-              <h2>{game.clue_question}</h2>
-            </div>
-            <div className="flow-clue-block flow-answer-block">
-              <span>RESPOSTA / PISTA</span>
-              <h2>{game.clue_answer}</h2>
-            </div>
+            {game.phase !== "revealed" && (
+              <>
+                <div className="flow-clue-block">
+                  <span>PERGUNTA</span>
+                  <h2>{game.clue_question}</h2>
+                </div>
+                <div className="flow-clue-block flow-answer-block">
+                  <span>RESPOSTA / PISTA</span>
+                  <h2>{game.clue_answer}</h2>
+                </div>
+              </>
+            )}
 
             {game.phase === "revealed" ? (
               <section className="flow-reveal-panel">
                 <span className="flow-eyebrow">A PESSOA ERA</span>
                 <h2 className="flow-revealed-name">{game.revealed_player_name}</h2>
-                <h3>Resultado dos palpites</h3>
-                {game.reveal_results?.length ? (
-                  <div className="flow-results-list">
-                    {game.reveal_results.map((result, index) => (
-                      <div className="flow-result-row" key={`${result.playerName}-${result.questionNumber}-${index}`}>
-                        <div>
-                          <strong>{result.playerName}</strong>
-                          <small>
-                            Pergunta {result.questionNumber}: {result.guessedName}
-                          </small>
-                        </div>
-                        <span className={result.isCorrect ? "is-correct" : "is-incorrect"}>
-                          {result.isCorrect ? `Acertou · +${result.pointsAwarded} pts` : "Errou · 0 pts"}
-                        </span>
-                      </div>
-                    ))}
-                  </div>
-                ) : (
-                  <p className="flow-empty">Ninguém enviou palpites nesta rodada.</p>
-                )}
+                <h3>Pontuação atual</h3>
+                <div className="flow-results-list">
+                  {ranking.map((player) => (
+                    <div className="flow-result-row" key={player.id}>
+                      <strong>{player.player_name}</strong>
+                      <span>{Number(player.score) || 0} pts</span>
+                    </div>
+                  ))}
+                </div>
                 <button
                   className="flow-button flow-button-primary flow-action-button"
                   onClick={() => runHostAction("next-game-round", "Próxima rodada iniciada!")}
