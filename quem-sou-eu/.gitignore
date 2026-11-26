@@ -26,3 +26,17 @@ dist-ssr
 .env
 .env.*
 !.env.example
+
+
+# Dependências do Node.js
+node_modules/
+**/node_modules/
+
+# Arquivos gerados durante a compilação
+dist/
+**/dist/
+
+# Variáveis de ambiente e informações privadas
+.env
+.env.*
+!.env.example
