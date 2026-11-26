@@ -473,3 +473,191 @@
   color: #c49aff;
   font-size: 14px;
 }
+
+
+/* Ações de controle da partida e divulgação dos resultados. */
+.flow-action-button {
+  width: 100%;
+  margin-top: 22px;
+}
+
+.flow-back-button {
+  margin-top: 24px;
+}
+
+.flow-success {
+  margin: 14px 0;
+  color: #79d6a4;
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.flow-reveal-panel {
+  margin-top: 28px;
+  padding: 24px;
+  border: 1px solid rgba(121, 214, 164, 0.4);
+  border-radius: 14px;
+  background: rgba(35, 92, 65, 0.14);
+}
+
+.flow-reveal-panel h3 {
+  margin: 26px 0 14px;
+  font-size: 18px;
+}
+
+.flow-revealed-name {
+  margin: 10px 0 0;
+  color: #79d6a4;
+  font-size: clamp(28px, 5vw, 42px);
+  overflow-wrap: anywhere;
+}
+
+.flow-results-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.flow-result-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 13px;
+  border: 1px solid #40364c;
+  border-radius: 10px;
+  background: rgba(18, 14, 27, 0.65);
+}
+
+.flow-result-row > div {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  min-width: 0;
+}
+
+.flow-result-row small {
+  color: #aaa3b8;
+  overflow-wrap: anywhere;
+}
+
+.flow-result-row > span {
+  flex-shrink: 0;
+  font-size: 12px;
+  font-weight: 800;
+  text-align: right;
+}
+
+.flow-result-row .is-correct {
+  color: #79d6a4;
+}
+
+.flow-result-row .is-incorrect {
+  color: #ffaaaa;
+}
+
+.flow-ranking {
+  margin-top: 26px;
+}
+
+.flow-ranking > h2 {
+  margin-bottom: 6px;
+  font-size: 24px;
+}
+
+.flow-ranking > p {
+  margin-bottom: 20px;
+  color: #aaa3b8;
+}
+
+.flow-ranking-row {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  margin-top: 10px;
+  padding: 15px;
+  border: 1px solid #493469;
+  border-radius: 11px;
+  background: #211a2c;
+}
+
+.flow-ranking-position {
+  color: #c09aff;
+  font-size: 18px;
+}
+
+.flow-ranking-row > span {
+  flex: 1;
+  overflow-wrap: anywhere;
+}
+
+.flow-ranking-row > b {
+  color: #79d6a4;
+  white-space: nowrap;
+}
+
+@media (max-width: 600px) {
+  .flow-result-row {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .flow-result-row > span {
+    text-align: left;
+  }
+}
+
+
+/* Indicador privado de quantidade de participantes que já concluíram o palpite. */
+.flow-participation {
+  margin: 18px 0 22px;
+  padding: 17px 18px;
+  border: 1px solid #493469;
+  border-radius: 12px;
+  background: #211a2c;
+}
+
+.flow-participation-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  margin-bottom: 12px;
+}
+
+.flow-participation-heading > div {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.flow-participation-heading strong {
+  color: #f4effb;
+  font-size: 14px;
+}
+
+.flow-participation-heading small {
+  color: #aaa3b8;
+  font-size: 11px;
+}
+
+.flow-participation-heading > b {
+  color: #c09aff;
+  font-size: 22px;
+  white-space: nowrap;
+}
+
+.flow-participation-track {
+  height: 9px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: #382c49;
+}
+
+.flow-participation-track > span {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: linear-gradient(90deg, #7543c4, #79d6a4);
+  transition: width 0.3s ease;
+}
