@@ -239,6 +239,17 @@ function PlayerGame() {
                 <b>{Number(roomPlayer.score) || 0} pts</b>
               </div>
             ))}
+            <button
+              type="button"
+              className="flow-button flow-button-primary flow-action-button"
+              onClick={() => {
+                // Limpa os dados desta sala para não reutilizá-los ao voltar.
+                sessionStorage.removeItem("playerRoomData");
+                navigate("/", { replace: true });
+              }}
+            >
+              SAIR
+            </button>
           </section>
         ) : (
           <>

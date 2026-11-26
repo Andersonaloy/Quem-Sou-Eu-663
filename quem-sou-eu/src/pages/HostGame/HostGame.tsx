@@ -339,9 +339,13 @@ function HostGame() {
 
         <button
           className="flow-button flow-button-secondary flow-back-button"
-          onClick={() => navigate("/host/lobby", { state: room })}
+          onClick={() => {
+            // Remove os dados da sala encerrada antes de voltar ao início.
+            sessionStorage.removeItem("hostRoomData");
+            navigate("/", { replace: true });
+          }}
         >
-          VOLTAR À SALA
+          SAIR
         </button>
       </section>
     </main>
