@@ -38,6 +38,8 @@ function PlayerGame() {
 
   const [game, setGame] = useState<PublicGameState | null>(null);
   const [players, setPlayers] = useState<RoomPlayer[]>([]);
+  // null enquanto o servidor ainda não confirmou se este jogador é o alvo.
+  const [isTargetPlayer, setIsTargetPlayer] = useState<boolean | null>(null);
   const [selectedPlayerId, setSelectedPlayerId] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [guessSubmitted, setGuessSubmitted] = useState(false);
@@ -70,6 +72,30 @@ function PlayerGame() {
       } else if (data) {
         setGame(data);
         setError("");
+
+        // A identidade do participante sorteado nunca é consultada
+        // diretamente pelo navegador. O servidor retorna somente
+        // se ESTE jogador é ou não a pessoa da rodada.
+        const { data: roleData, error: roleError } =
+          await supabase.functions.invoke("get-player-round-role", {
+            body: {
+              roomId,
+              playerId: player!.playerId,
+            },
+          });
+
+        if (!active) return;
+
+        if (roleError || !roleData?.success) {
+          console.error("Erro ao verificar papel do jogador:", roleError, roleData);
+          setIsTargetPlayer(null);
+          setError(
+            roleData?.message ||
+              "Não foi possível verificar sua participação nesta rodada."
+          );
+        } else if (roleData.roundId === data.round_id) {
+          setIsTargetPlayer(Boolean(roleData.isTargetPlayer));
+        }
       }
     }
 
@@ -128,6 +154,7 @@ function PlayerGame() {
     setSelectedPlayerId("");
     setGuessSubmitted(false);
     setGuessResult(null);
+    setIsTargetPlayer(null);
     setError("");
   }, [game?.round_id, game?.question_number]);
 
@@ -216,7 +243,18 @@ function PlayerGame() {
               <h2>{game.clue_answer}</h2>
             </div>
 
-            {game.phase === "asking" ? (
+            {isTargetPlayer === null ? (
+              <p className="flow-note">Verificando sua participação nesta rodada...</p>
+            ) : isTargetPlayer ? (
+              <section className="flow-target-message" role="status">
+                <span className="flow-target-icon" aria-hidden="true">🤫</span>
+                <h2>Você é a pessoa desta rodada!</h2>
+                <p>
+                  Não fale nada e mantenha o segredo! Agora é a vez dos seus
+                  colegas tentarem descobrir quem é você.
+                </p>
+              </section>
+            ) : game.phase === "asking" ? (
               <section className="flow-guess-section">
                 <div className="flow-guess-heading">
                   <h2>Quem você acha que é?</h2>

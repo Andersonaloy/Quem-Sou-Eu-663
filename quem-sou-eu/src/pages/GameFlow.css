@@ -434,3 +434,42 @@
     grid-template-columns: 1fr;
   }
 }
+
+
+/* Aviso privado para o participante que é a resposta da rodada. */
+.flow-target-message {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  margin-top: 28px;
+  padding: 28px 22px;
+  border: 1px solid rgba(167, 122, 240, 0.55);
+  border-radius: 16px;
+  background: linear-gradient(145deg, rgba(91, 57, 130, 0.28), rgba(33, 26, 44, 0.96));
+  text-align: center;
+}
+
+.flow-target-icon {
+  font-size: 38px;
+  line-height: 1;
+}
+
+.flow-target-message h2 {
+  margin: 0;
+  color: #d7baff;
+  font-size: 22px;
+}
+
+.flow-target-message p {
+  max-width: 440px;
+  margin: 0;
+  color: #e0d9e9;
+  font-size: 15px;
+  line-height: 1.65;
+}
+
+.flow-target-message strong {
+  color: #c49aff;
+  font-size: 14px;
+}
