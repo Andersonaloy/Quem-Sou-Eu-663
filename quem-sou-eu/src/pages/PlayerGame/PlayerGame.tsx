@@ -265,6 +265,17 @@ function PlayerGame() {
               <section className="flow-reveal-panel">
                 <span className="flow-eyebrow">A PESSOA ERA</span>
                 <h2 className="flow-revealed-name">{game.revealed_player_name}</h2>
+
+                {/* O bônus é exibido somente para a pessoa sorteada,
+                    e apenas quando nenhum palpite da rodada foi correto. */}
+                {game.revealed_player_name === player.playerName &&
+                  !(game.reveal_results ?? []).some((result) => result.isCorrect) && (
+                    <div className="flow-bonus-message" role="status">
+                      <strong>Ninguém te descobriu!</strong>
+                      <span>+1 pt</span>
+                    </div>
+                  )}
+
                 <h3>Pontuação atual</h3>
                 <div className="flow-results-list">
                   {ranking.map((roomPlayer) => (
